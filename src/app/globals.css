@@ -39,3 +39,18 @@ body {
   font-weight: normal;
   font-style: normal;
 }
+
+/* Subtle scrollbar for modal & table */
+.custom-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scroll::-webkit-scrollbar-thumb {
+  background: #c1a38f; /* matches theme */
+  border-radius: 9999px;
+}
+.custom-scroll::-webkit-scrollbar-thumb:hover {
+  background: #a78974;
+}

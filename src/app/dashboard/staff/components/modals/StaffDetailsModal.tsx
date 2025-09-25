@@ -55,7 +55,7 @@ const StaffDetailsModal = ({ staff, onEdit, onDelete, onClose }: Props) => (
           Edit
         </button>
         <button
-          onClick={() => onDelete(staff.staff_id)}
+          onClick={() => onDelete(staff.staff_id!)}
           className="px-6 py-2 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition"
         >
           Delete

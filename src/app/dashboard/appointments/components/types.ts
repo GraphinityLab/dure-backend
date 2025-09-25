@@ -47,18 +47,19 @@ export interface Timeslot {
 
 
 export interface Staff {
-  staff_id?: number;
+  staff_id: number;
   firstName: string;
   lastName: string;
   email: string;
   username: string;
-  password: string;
+  password: string,
   phoneNumber: string;
-  address: string;
-  city: string;
-  province: string;
-  postalCode: string;
+  address?: string;
+  city?: string;
+  province?: string;
+  postalCode?: string;
   roleId: string;
+  roleName: string;
 }
 
 export interface Role {

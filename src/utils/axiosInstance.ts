@@ -16,47 +16,46 @@ const axiosInstance: AxiosInstance = axios.create({
 });
 
 /**
- * Add a request interceptor to include the Authorization and permissions headers.
- *
- * This interceptor runs before every request is sent. It checks for a JWT token
- * and a 'permissions' item in the browser's local storage.
- *
- * If a token is found, it adds an 'Authorization: Bearer <token>' header.
- * If permissions are found, it adds a custom 'x-user-permissions' header.
- * This is crucial for authenticating requests and for backend permission checks.
+ * Add a request interceptor to include:
+ *  - Authorization (JWT)
+ *  - Permissions (for RBAC)
+ *  - Identity headers (first/last name, staff ID) for ChangeLogs
  */
 axiosInstance.interceptors.request.use(
   (config) => {
     try {
-      // Retrieve the JWT token from local storage
+      // 🔑 JWT token for authentication
       const token = localStorage.getItem('token');
       if (token) {
-        // Add the Authorization header for authentication
         config.headers.Authorization = `Bearer ${token}`;
       }
 
-      // Retrieve the permissions string from local storage
+      // 🔑 Permissions for RBAC
       const permissionsString = localStorage.getItem('permissions');
       if (permissionsString) {
-        // Parse the JSON string to get the permissions array
         const permissions = JSON.parse(permissionsString);
-        
-        // Check if the permissions array is valid before adding the header
         if (Array.isArray(permissions)) {
           config.headers['x-user-permissions'] = permissionsString;
         }
       }
+
+      // 🔑 Identity headers for ChangeLogs
+      const firstName = localStorage.getItem('first_name');
+      const lastName = localStorage.getItem('last_name');
+      const staffId = localStorage.getItem('staff_id');
+
+      if (firstName) config.headers['x-first-name'] = firstName;
+      if (lastName) config.headers['x-last-name'] = lastName;
+      if (staffId) config.headers['x-staff-id'] = staffId;
     } catch (error) {
-      // Log any errors that occur during parsing, but do not block the request.
       console.error('Failed to retrieve data from local storage:', error);
     }
+
     return config;
   },
   (error: AxiosError) => {
-    // Handle request errors
     return Promise.reject(error);
   }
 );
 
-// Export the configured Axios instance for use throughout the application.
 export default axiosInstance;

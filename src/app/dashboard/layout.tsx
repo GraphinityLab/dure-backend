@@ -9,27 +9,55 @@ import {
   Scissors,
   Settings,
   LogOut,
-  UserCircle
+  FileText,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const navItems = [
-  { href: "/dashboard/appointments", label: "Appointments", icon: Calendar },
-  { href: "/dashboard/clients", label: "Clients", icon: Users },
-  { href: "/dashboard/staff", label: "Staff", icon: UserCog },
-  { href: "/dashboard/services", label: "Services", icon: Scissors },
-  { href: "/dashboard/roles", label: "Roles", icon: Settings },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission: string;
+};
+
+const navItems: NavItem[] = [
+  { href: "/dashboard/appointments", label: "Appointments", icon: Calendar, permission: "see_appointments" },
+  { href: "/dashboard/clients", label: "Clients", icon: Users, permission: "see_clients" },
+  { href: "/dashboard/staff", label: "Staff", icon: UserCog, permission: "see_staff" },
+  { href: "/dashboard/services", label: "Services", icon: Scissors, permission: "see_services" },
+  { href: "/dashboard/roles", label: "Roles", icon: Settings, permission: "see_roles" },
+  { href: "/dashboard/logs", label: "Logs", icon: FileText, permission: "see_logs" },
+  { href: "/dashboard/history", label: "Previous Appointments", icon: FileText, permission: "see_history" },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
+  const [staffId, setStaffId] = useState<string | null>(null);
+  const [staffInitials, setStaffInitials] = useState<string>("👤");
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => {
-    const storedId = localStorage.getItem("user_id");
-    if (storedId) {
-      setUserId(storedId);
+    const storedStaffId = localStorage.getItem("staff_id");
+    const storedFirst = localStorage.getItem("first_name");
+    const storedLast = localStorage.getItem("last_name");
+
+    if (storedStaffId) {
+      setStaffId(storedStaffId);
+
+      if (storedFirst || storedLast) {
+        const initials = `${storedFirst?.[0] ?? ""}${storedLast?.[0] ?? ""}`;
+        setStaffInitials(initials.toUpperCase() || "👤");
+      }
+    }
+
+    const storedPermissions = localStorage.getItem("permissions");
+    if (storedPermissions) {
+      try {
+        setPermissions(JSON.parse(storedPermissions));
+      } catch {
+        console.warn("Failed to parse permissions from localStorage");
+      }
     }
   }, []);
 
@@ -38,6 +66,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     localStorage.removeItem("permissions");
     localStorage.removeItem("username");
     localStorage.removeItem("user_id");
+    localStorage.removeItem("staff_id");
+    localStorage.removeItem("first_name");
+    localStorage.removeItem("last_name");
     window.location.href = "/login";
   };
 
@@ -49,34 +80,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <h1 className="text-2xl font-bold font-[Soligant] tracking-tight">
             Dashboard
           </h1>
-          {userId && (
-            <Link href={`/dashboard/staff/${userId}`}>
+
+          {staffId && (
+            <Link href={`/dashboard/staff/${staffId}`}>
               <motion.div
                 whileHover={{ scale: 1.1 }}
-                className="p-2 rounded-full bg-[#5f4b5a] hover:bg-[#7b6576] cursor-pointer transition"
+                className="ml-4 w-10 h-10 flex items-center justify-center rounded-full bg-[#5f4b5a] hover:bg-[#7b6576] cursor-pointer transition text-white font-semibold"
               >
-                <UserCircle className="w-6 h-6 text-white" />
+                {staffInitials}
               </motion.div>
             </Link>
           )}
         </div>
 
         <nav className="flex flex-col gap-3 flex-1">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const active = pathname.startsWith(href);
-            return (
-              <Link key={href} href={href}>
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition 
-                    ${active ? "bg-[#f6e9da] text-[#3e2e3d]" : "hover:bg-[#5f4b5a]"}`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="font-[CaviarDreams]">{label}</span>
-                </motion.div>
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => permissions.includes(item.permission))
+            .map(({ href, label, icon: Icon }) => {
+              const active = pathname.startsWith(href);
+              return (
+                <Link key={href} href={href}>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition 
+                      ${active ? "bg-[#f6e9da] text-[#3e2e3d]" : "hover:bg-[#5f4b5a]"}`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    <span className="font-[CaviarDreams]">{label}</span>
+                  </motion.div>
+                </Link>
+              );
+            })}
         </nav>
 
         {/* Logout Button */}

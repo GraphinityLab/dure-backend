@@ -2,8 +2,8 @@
 import React, { useState, FormEvent, ChangeEvent } from 'react';
 import { motion } from 'framer-motion';
 import axiosInstance from '@/utils/axiosInstance';
-import { AxiosError } from 'axios';
 import { jwtDecode } from 'jwt-decode';
+import { AxiosError } from 'axios';
 
 // Types
 interface FormData {
@@ -11,16 +11,24 @@ interface FormData {
   password: string;
 }
 interface JWTPayload {
-  permissions: string[];
-  user_id: number;
+  staff_id: number;
   email: string;
+  username?: string;
   role_id: number;
   role_name: string;
-  username?: string; // 👈 added
+  first_name?: string;
+  last_name?: string;
+  permissions: string[];
 }
 interface LoginResponse {
   message: string;
   token: string;
+  staff_id: number;
+  username: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  permissions: string[];
 }
 
 const Login: React.FC = () => {
@@ -29,8 +37,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -39,27 +46,31 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await axiosInstance.post<LoginResponse>('/auth', formData);
+      const response = await axiosInstance.post('/auth', formData);
+      const data = response.data as LoginResponse;
 
-      if (response.status === 200 && response.data.token) {
-        const decodedToken = jwtDecode<JWTPayload>(response.data.token);
+      if (data?.token) {
+        const decoded = jwtDecode(data.token) as JWTPayload;
 
-        // store everything needed
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('permissions', JSON.stringify(decodedToken.permissions));
-        localStorage.setItem('username', decodedToken.username || decodedToken.email); // 👈 now stored
-        localStorage.setItem("user_id", decodedToken.user_id.toString()); 
+        // ✅ Store everything in localStorage
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('permissions', JSON.stringify(decoded.permissions));
+        localStorage.setItem('username', decoded.username || decoded.email);
+        localStorage.setItem('staff_id', decoded.staff_id.toString());
+        localStorage.setItem('first_name', decoded.first_name || data.first_name || '');
+        localStorage.setItem('last_name', decoded.last_name || data.last_name || '');
+
         setMessage('Login successful! Redirecting...');
-        window.location.href = '/dashboard/appointments';
+        setTimeout(() => {
+          window.location.href = '/dashboard/appointments';
+        }, 300);
       } else {
-        setMessage(response.data.message || 'Login failed. Please check your credentials.');
+        setMessage(data.message || 'Login failed. Please check your credentials.');
       }
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      const errorMessage =
-        (axiosError.response?.data as { message?: string })?.message ||
-        'An unknown error occurred. Please try again.';
-      setMessage(`Login failed: ${errorMessage}`);
+    } catch (err) {
+      console.error('Login error:', err);
+      const axiosError = err as AxiosError<{ message?: string }>;
+      setMessage(`Login failed: ${axiosError.response?.data?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
@@ -67,14 +78,7 @@ const Login: React.FC = () => {
 
   return (
     <section className="relative overflow-hidden py-24 px-6 min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f6e9da] via-[#f2dfce] to-[#e8d4be] text-[#3e2e3d]">
-      {/* Decorative Background Blobs */}
-      <div className="absolute inset-0 -z-10 pointer-events-none">
-        <div className="absolute top-[10%] left-[15%] w-[280px] h-[280px] bg-rose-100/40 blur-[100px] rounded-full" />
-        <div className="absolute bottom-[10%] right-[15%] w-[220px] h-[220px] bg-pink-200/30 blur-[90px] rounded-full" />
-      </div>
-
       <div className="w-full max-w-md">
-        {/* Heading */}
         <motion.h1
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -84,50 +88,42 @@ const Login: React.FC = () => {
           Admin Login
         </motion.h1>
 
-        {/* Login Card */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
           className="bg-white/80 p-10 rounded-3xl shadow-lg border border-[#e8dcd4] backdrop-blur-md"
         >
           <form onSubmit={handleSubmit} className="space-y-6 font-[CaviarDreams]">
-            <div>
-              <label htmlFor="identifier" className="block text-sm mb-1">Email or Username</label>
-              <input
-                type="text"
-                id="identifier"
-                name="identifier"
-                required
-                value={formData.identifier}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#e8dcd4] rounded-full text-sm bg-white/70 focus:ring-2 focus:ring-[#3e2e3d] focus:outline-none"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm mb-1">Password</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                required
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-[#e8dcd4] rounded-full text-sm bg-white/70 focus:ring-2 focus:ring-[#3e2e3d] focus:outline-none"
-              />
-            </div>
-
+            <input
+              type="text"
+              name="identifier"
+              placeholder="Email or Username"
+              value={formData.identifier}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border rounded-full"
+              required
+            />
+            <input
+              type="password"
+              name="password"
+              placeholder="Password"
+              value={formData.password}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border rounded-full"
+              required
+            />
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-4 px-6 py-3 rounded-full bg-[#3e2e3d] text-white hover:bg-[#5f4b5a] transition font-[CaviarDreams] text-sm uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-4 px-6 py-3 rounded-full bg-[#3e2e3d] text-white hover:bg-[#5f4b5a]"
             >
               {loading ? 'Logging In...' : 'Log In'}
             </button>
           </form>
 
           {message && (
-            <p className={`mt-6 text-center text-sm font-[CaviarDreams] ${message.includes('success') ? 'text-green-600' : 'text-red-600'}`}>
+            <p className={`mt-6 text-center ${message.includes('successful') ? 'text-green-600' : 'text-red-600'}`}>
               {message}
             </p>
           )}
