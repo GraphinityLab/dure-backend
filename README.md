@@ -130,6 +130,6 @@ Every action is tracked with \`changed_by\`:
 
 ---
 
-## 📄 License  
+##   
 
-MIT © 2025 — Built with 💖 for Dure Aesthetics
+GRAPHINITY LAB © 2025 — Built with 💖 for Dure Aesthetics
