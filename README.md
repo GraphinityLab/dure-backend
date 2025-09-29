@@ -46,17 +46,17 @@ _Add screenshots of your app here._
 
 Clone the repo and install dependencies:  
 
-\`\`\`bash
+```bash
 git clone https://github.com/yourusername/dure-backend.git
 cd dure-backend
 npm install
-\`\`\`
+```
 
 Run the dev server:  
 
-\`\`\`bash
+```bash
 npm run dev
-\`\`\`
+```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser.  
 
