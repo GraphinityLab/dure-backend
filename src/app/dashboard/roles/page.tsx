@@ -100,22 +100,38 @@ const RolesPage = () => {
         try {
             await axiosInstance.delete(`/roles/${roleId}`, {
                 headers: { 'x-user-permissions': JSON.stringify(['role_delete']) },
-                // Add a data property with a value of null or an empty object
-                // to prevent the backend from throwing a SyntaxError for an empty body.
-                data: null,
+                data: null, // prevent backend SyntaxError on empty body
             });
-            setStatus({ message: 'Role deleted successfully!', type: 'success' });
+
+            // Always close modal before showing status
             closeModal();
+            setStatus({ message: 'Role deleted successfully!', type: 'success' });
             fetchData();
         } catch (err: unknown) {
             console.error('Failed to delete role:', err);
+
+            // Close modal even if error occurs
+            closeModal();
+
             if (axios.isAxiosError(err) && err.response) {
-                setStatus({ message: `Error: ${err.response.data?.message}`, type: 'error' });
+                if (err.response.status === 409) {
+                    setStatus({
+                        message: err.response.data?.message || 'Cannot delete role because it is assigned to staff.',
+                        type: 'error',
+                    });
+                } else {
+                    setStatus({
+                        message: `Error: ${err.response.data?.message || 'API call failed.'}`,
+                        type: 'error',
+                    });
+                }
             } else {
                 setStatus({ message: 'An unknown error occurred.', type: 'error' });
             }
         }
     };
+
+
 
     /**
      * Toggles a permission for a selected role.

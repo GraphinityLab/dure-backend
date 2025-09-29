@@ -204,13 +204,18 @@ const ServicesPage = () => {
 
         {status.message && (
           <div
-            className={`p-4 rounded-md mb-4 ${
-              status.type === 'success'
+            className={`p-4 rounded-md mb-4 ${status.type === 'success'
                 ? 'bg-green-100 text-green-700'
                 : 'bg-red-100 text-red-700'
-            }`}
+              }`}
           >
             {status.message}
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-md">
+            {error}
           </div>
         )}
 
@@ -243,11 +248,10 @@ const ServicesPage = () => {
                 key={i}
                 onClick={() => setActiveCategory(category)}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm shadow-sm transition
-                ${
-                  isActive
+                ${isActive
                     ? 'bg-[#3e2e3d] text-white'
                     : 'bg-white text-[#3e2e3d] border border-[#d8c9c9] hover:bg-[#f5eeee]'
-                }`}
+                  }`}
               >
                 {category}
               </button>

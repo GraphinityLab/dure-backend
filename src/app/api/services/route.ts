@@ -1,5 +1,6 @@
+// src/app/api/services/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { NextApiRequest } from "next";
+import { NextApiRequest, NextApiResponse } from "next";
 import { getServices, createService } from "@/controllers/servicesController";
 
 // ---------------- Permissions ----------------
@@ -10,7 +11,7 @@ const checkPermissions = (request: NextRequest, requiredPermissions: string[]) =
   }
 
   try {
-    const userPermissions = JSON.parse(userPermissionsHeader);
+    const userPermissions: string[] = JSON.parse(userPermissionsHeader);
     const hasPermission = requiredPermissions.every((p) =>
       userPermissions.includes(p)
     );
@@ -25,26 +26,38 @@ const checkPermissions = (request: NextRequest, requiredPermissions: string[]) =
 };
 
 // ---------------- Helpers ----------------
-const createMockApiObjects = async (request: NextRequest, includeBody: boolean = false) => {
-  let responseData: any;
-  let responseStatus: number = 200;
+interface MockApi {
+  mockRequest: NextApiRequest;
+  mockResponse: NextApiResponse;
+  responseData: unknown;
+  responseStatus: number;
+}
 
-  const mockRequest: NextApiRequest = {
+const createMockApiObjects = async (
+  request: NextRequest,
+  includeBody: boolean = false
+): Promise<MockApi> => {
+  let responseData: unknown;
+  let responseStatus = 200;
+
+  const mockRequest = {
     method: request.method as "GET" | "POST",
     body: includeBody ? await request.json().catch(() => ({})) : {},
     query: Object.fromEntries(request.nextUrl.searchParams),
-    headers: Object.fromEntries(request.headers), // ✅ forward headers
-  } as NextApiRequest;
+    headers: Object.fromEntries(request.headers),
+  } as unknown as NextApiRequest;
 
+  // cast as NextApiResponse so controllers accept it
   const mockResponse = {
     status: (statusCode: number) => {
       responseStatus = statusCode;
       return mockResponse;
     },
-    json: (data: any) => {
+    json: (data: unknown) => {
       responseData = data;
+      return mockResponse;
     },
-  };
+  } as unknown as NextApiResponse;
 
   return {
     mockRequest,
@@ -52,8 +65,14 @@ const createMockApiObjects = async (request: NextRequest, includeBody: boolean =
     get responseData() {
       return responseData;
     },
+    set responseData(value: unknown) {
+      responseData = value;
+    },
     get responseStatus() {
       return responseStatus;
+    },
+    set responseStatus(value: number) {
+      responseStatus = value;
     },
   };
 };
@@ -66,7 +85,7 @@ export async function GET(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const api = await createMockApiObjects(request);
-  await getServices(api.mockRequest, api.mockResponse as any);
+  await getServices(api.mockRequest, api.mockResponse);
   return NextResponse.json(api.responseData, { status: api.responseStatus });
 }
 
@@ -76,6 +95,6 @@ export async function POST(request: NextRequest) {
   if (permissionError) return permissionError;
 
   const api = await createMockApiObjects(request, true);
-  await createService(api.mockRequest, api.mockResponse as any);
+  await createService(api.mockRequest, api.mockResponse);
   return NextResponse.json(api.responseData, { status: api.responseStatus });
 }

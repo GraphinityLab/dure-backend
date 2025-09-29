@@ -22,37 +22,57 @@ const checkPermissions = (request: NextRequest, requiredPermissions: string[]) =
   }
 };
 
-// GET appointment by ID
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+// -------------------- GET appointment by ID --------------------
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
   const permissionError = checkPermissions(req, ["appointment_read_single"]);
   if (permissionError) return permissionError;
 
-  const appointment = await getAppointmentById(params.id);
+  const appointment = await getAppointmentById(id);
   if (!appointment) return NextResponse.json({ message: "Not found" }, { status: 404 });
   return NextResponse.json(appointment);
 }
 
-// PUT update appointment
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+// -------------------- PUT update appointment --------------------
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
   const permissionError = checkPermissions(req, ["appointment_update"]);
   if (permissionError) return permissionError;
 
   const body = await req.json();
-  const result = await updateAppointment({ ...body, appointment_id: params.id });
+  const result = await updateAppointment({ ...body, appointment_id: id });
   return NextResponse.json(result);
 }
 
-// DELETE appointment
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+// -------------------- DELETE appointment --------------------
+export async function DELETE(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
   const permissionError = checkPermissions(req, ["appointment_delete"]);
   if (permissionError) return permissionError;
 
-  const result = await deleteAppointment(params.id);
+  const result = await deleteAppointment(id);
   return NextResponse.json(result);
 }
 
-// PATCH confirm/decline appointment
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+// -------------------- PATCH confirm/decline appointment --------------------
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  const { id } = await context.params;
+
   const permissionError = checkPermissions(req, ["appointment_confirm_deny"]);
   if (permissionError) return permissionError;
 
@@ -62,7 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const result = await confirmDeclineAppointment({
-    appointment_id: params.id,
+    appointment_id: id,
     status: body.status,
     staff_id: body.staff_id,
     reason: body.reason,

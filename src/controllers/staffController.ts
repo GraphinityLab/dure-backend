@@ -105,8 +105,8 @@ export const getCurrentStaff = async (req: NextApiRequest, res: NextApiResponse)
     const token = authHeader.split(" ")[1];
     if (!token) return res.status(401).json({ message: "Token missing." });
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
-    const username = decoded.username;
+    const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    const username = decoded.username as string;
 
     const connection = await pool.getConnection();
     const [rows] = await connection.execute<StaffResult[]>(
@@ -120,9 +120,13 @@ export const getCurrentStaff = async (req: NextApiRequest, res: NextApiResponse)
     if (rows.length === 0) return res.status(404).json({ message: "Staff not found." });
 
     res.status(200).json(rows[0]);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Get current staff error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    if (error instanceof Error) {
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } else {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   }
 };
 
@@ -132,7 +136,7 @@ export const updateStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     const staff_id = Number(req.query.id);
     if (isNaN(staff_id)) return res.status(400).json({ message: "Invalid staff_id" });
 
-    const fieldsToUpdate: Record<string, any> = { ...req.body };
+    const fieldsToUpdate: Partial<StaffResult & { password?: string }> = { ...req.body };
     delete fieldsToUpdate.staff_id;
 
     const allowedFields = new Set([
@@ -141,12 +145,14 @@ export const updateStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     ]);
 
     for (const key of Object.keys(fieldsToUpdate)) {
-      const value = fieldsToUpdate[key];
+      const value = fieldsToUpdate[key as keyof typeof fieldsToUpdate];
       if (!allowedFields.has(key) || value === undefined) {
-        delete fieldsToUpdate[key];
+        delete fieldsToUpdate[key as keyof typeof fieldsToUpdate];
         continue;
       }
-      if (key === "role_id" && value !== null) fieldsToUpdate[key] = Number(value);
+      if (key === "role_id" && value !== null) {
+        fieldsToUpdate[key as "role_id"] = Number(value);
+      }
     }
 
     if (fieldsToUpdate.password) {
@@ -157,7 +163,7 @@ export const updateStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     const keys = Object.keys(fieldsToUpdate);
     if (keys.length === 0) return res.status(400).json({ message: "No fields provided to update." });
 
-    const values = keys.map((key) => fieldsToUpdate[key]);
+    const values = keys.map((key) => fieldsToUpdate[key as keyof typeof fieldsToUpdate]);
     const setString = keys.map((key) => `${key} = ?`).join(", ");
 
     const connection = await pool.getConnection();
@@ -200,9 +206,12 @@ export const updateStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     } finally {
       connection.release();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Update staff error:", err);
-    return res.status(500).json({ message: "Internal Server Error", error: err.message || err });
+    if (err instanceof Error) {
+      return res.status(500).json({ message: "Internal Server Error", error: err.message });
+    }
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -251,9 +260,13 @@ export const createStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     });
 
     res.status(201).json({ message: "Staff created successfully.", staff_id: result.insertId });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Create staff error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    if (error instanceof Error) {
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } else {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   }
 };
 
@@ -294,9 +307,12 @@ export const deleteStaff = async (req: NextApiRequest, res: NextApiResponse) => 
     });
 
     return res.status(200).json({ message: "Staff deleted successfully." });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Delete staff error:", error);
-    return res.status(500).json({ message: "Internal Server Error", error });
+    if (error instanceof Error) {
+      return res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };
 
@@ -325,9 +341,13 @@ export const getAllStaff = async (req: NextApiRequest, res: NextApiResponse) => 
 
     connection.release();
     res.status(200).json(rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Get all staff error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    if (error instanceof Error) {
+      res.status(500).json({ message: "Internal Server Error", error: error.message });
+    } else {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   }
 };
 
@@ -360,9 +380,13 @@ export const getStaffByID = async (req: NextApiRequest, res: NextApiResponse) =>
     } finally {
       connection.release();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Get staff by ID error:", err);
-    res.status(500).json({ message: "Internal Server Error", error: err.message || err });
+    if (err instanceof Error) {
+      res.status(500).json({ message: "Internal Server Error", error: err.message });
+    } else {
+      res.status(500).json({ message: "Internal Server Error" });
+    }
   }
 };
 
@@ -403,11 +427,14 @@ export const verifyStaffPassword = async (req: NextApiRequest, res: NextApiRespo
     } finally {
       connection.release();
     }
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("verifyStaffPassword error:", err);
-    return res.status(500).json({
-      message: "Internal Server Error",
-      error: err?.message || String(err),
-    });
+    if (err instanceof Error) {
+      return res.status(500).json({
+        message: "Internal Server Error",
+        error: err.message,
+      });
+    }
+    return res.status(500).json({ message: "Internal Server Error" });
   }
 };

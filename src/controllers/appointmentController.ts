@@ -1,12 +1,11 @@
 // controllers/appointmentController.ts
-import { NextApiRequest } from "next";
 import pool from "@/utils/db";
 import { RowDataPacket, ResultSetHeader } from "mysql2";
 import { sendEmail } from "@/utils/emailutils";
 import moment from "moment";
 
 // ---------------- Types ----------------
-interface Appointment extends RowDataPacket {
+export interface Appointment extends RowDataPacket {
   appointment_id?: number;
   client_id: number;
   staff_id?: number | null;
@@ -18,7 +17,7 @@ interface Appointment extends RowDataPacket {
   status: "pending" | "confirmed" | "declined";
 }
 
-interface AppointmentWithDetails extends Appointment {
+export interface AppointmentWithDetails extends Appointment {
   userEmail: string;
   clientFirstName: string;
   clientLastName: string;
@@ -30,12 +29,19 @@ interface AppointmentWithDetails extends Appointment {
   staffLastName: string;
 }
 
+export type AppointmentInput = Omit<
+  Appointment,
+  "appointment_id"
+> & { appointment_id?: number };
+
+type GenericRow = RowDataPacket & Record<string, unknown>;
+
 // ---------------- Helpers ----------------
 async function saveHistory(
   appointment_id: number,
   changed_by: string | null = null
 ) {
-  const [rows] = await pool.execute<any[]>(
+  const [rows] = await pool.execute<GenericRow[]>(
     `SELECT a.*,
             CONCAT(c.first_name, ' ', c.last_name) AS client_name,
             s.name AS service_name,
@@ -112,7 +118,7 @@ async function logChange({
   entity_id: number;
   action: string;
   changed_by: string | null;
-  changes?: any;
+  changes?: Record<string, unknown> | null;
 }) {
   const timestamp = new Date();
   await pool.execute<ResultSetHeader>(
@@ -131,7 +137,7 @@ async function logChange({
 
 // ---------------- Controllers ----------------
 
-export async function getAppointments(mockRequest?: NextApiRequest) {
+export async function getAppointments() {
   const query = `
     SELECT 
       A.*,
@@ -145,7 +151,7 @@ export async function getAppointments(mockRequest?: NextApiRequest) {
     INNER JOIN Clients AS C ON A.client_id = C.client_id
     INNER JOIN Services AS S ON A.service_id = S.service_id
   `;
-  const [rows] = await pool.execute<any[]>(query);
+  const [rows] = await pool.execute<AppointmentWithDetails[]>(query);
   return rows;
 }
 
@@ -166,7 +172,10 @@ export async function getAppointmentById(id: string) {
   return rows[0] ?? null;
 }
 
-export async function createAppointment(data: any, changed_by: string | null = null) {
+export async function createAppointment(
+  data: AppointmentInput,
+  changed_by: string | null = null
+) {
   const [result] = await pool.execute<ResultSetHeader>(
     `INSERT INTO Appointments 
       (client_id, service_id, appointment_date, start_time, end_time, notes, status, staff_id) 
@@ -179,7 +188,7 @@ export async function createAppointment(data: any, changed_by: string | null = n
       data.end_time,
       data.notes,
       data.status,
-      data.staff_id,
+      data.staff_id ?? null,
     ]
   );
 
@@ -196,22 +205,25 @@ export async function createAppointment(data: any, changed_by: string | null = n
   return { message: "Appointment created successfully", appointment_id: newId };
 }
 
-export async function updateAppointment(data: any, changed_by: string | null = null) {
+export async function updateAppointment(
+  data: AppointmentInput,
+  changed_by: string | null = null
+) {
   const { appointment_id } = data;
+  if (!appointment_id) throw new Error("appointment_id is required");
 
-  const [beforeRows] = await pool.execute<any[]>(
-    `SELECT * FROM Appointments WHERE appointment_id = ?`,
-    [appointment_id]
-  );
+  const [beforeRows] = await pool.execute<Appointment[]>(`SELECT * FROM Appointments WHERE appointment_id = ?`, [
+    appointment_id,
+  ]);
   const before = beforeRows[0];
   if (!before) throw new Error("Appointment not found");
 
   const fields: string[] = [];
-  const params: any[] = [];
+  const params: (string | number | null)[] = [];
   for (const [key, value] of Object.entries(data)) {
     if (key !== "appointment_id") {
       fields.push(`${key} = ?`);
-      params.push(value);
+      params.push(value as string | number | null);
     }
   }
   params.push(appointment_id);
@@ -221,10 +233,9 @@ export async function updateAppointment(data: any, changed_by: string | null = n
     params
   );
 
-  const [afterRows] = await pool.execute<any[]>(
-    `SELECT * FROM Appointments WHERE appointment_id = ?`,
-    [appointment_id]
-  );
+  const [afterRows] = await pool.execute<Appointment[]>(`SELECT * FROM Appointments WHERE appointment_id = ?`, [
+    appointment_id,
+  ]);
   const after = afterRows[0];
 
   await saveHistory(Number(appointment_id), changed_by);
@@ -240,15 +251,19 @@ export async function updateAppointment(data: any, changed_by: string | null = n
 }
 
 export async function confirmDeclineAppointment(
-  data: { appointment_id: string; status: "confirmed" | "declined"; staff_id?: number; reason?: string },
+  data: {
+    appointment_id: string;
+    status: "confirmed" | "declined";
+    staff_id?: number;
+    reason?: string;
+  },
   changed_by: string | null = null
 ) {
   const { appointment_id, status, staff_id, reason } = data;
 
-  const [beforeRows] = await pool.execute<any[]>(
-    `SELECT * FROM Appointments WHERE appointment_id = ?`,
-    [appointment_id]
-  );
+  const [beforeRows] = await pool.execute<Appointment[]>(`SELECT * FROM Appointments WHERE appointment_id = ?`, [
+    appointment_id,
+  ]);
   const before = beforeRows[0];
   if (!before) throw new Error("Appointment not found");
 
@@ -264,10 +279,9 @@ export async function confirmDeclineAppointment(
     [status, staff_id ?? null, status === "declined" ? reason : null, appointment_id]
   );
 
-  const [afterRows] = await pool.execute<any[]>(
-    `SELECT * FROM Appointments WHERE appointment_id = ?`,
-    [appointment_id]
-  );
+  const [afterRows] = await pool.execute<Appointment[]>(`SELECT * FROM Appointments WHERE appointment_id = ?`, [
+    appointment_id,
+  ]);
   const after = afterRows[0];
 
   await saveHistory(Number(appointment_id), changed_by);
@@ -316,9 +330,7 @@ export async function confirmDeclineAppointment(
             <p>Your appointment for <b>${appointment.serviceName}</b> has been <b>confirmed</b>.</p>
             <p><b>Date:</b> ${appointmentDate}<br/>
                <b>Time:</b> ${startTime} - ${endTime}<br/>
-               <b>Staff:</b> ${appointment.staffFirstName ?? ""} ${
-              appointment.staffLastName ?? ""
-            }</p>
+               <b>Staff:</b> ${appointment.staffFirstName ?? ""} ${appointment.staffLastName ?? ""}</p>
           `
           : `
             <h2>Appointment Declined ❌</h2>
@@ -341,13 +353,13 @@ export async function confirmDeclineAppointment(
   return { message: `Appointment ${status} successfully` };
 }
 
-export async function deleteAppointment(id: string, changed_by: string | null = null) {
+export async function deleteAppointment(
+  id: string,
+  changed_by: string | null = null
+) {
   if (!id || isNaN(Number(id))) throw new Error("Invalid appointment ID");
 
-  const [beforeRows] = await pool.execute<any[]>(
-    `SELECT * FROM Appointments WHERE appointment_id = ?`,
-    [id]
-  );
+  const [beforeRows] = await pool.execute<Appointment[]>(`SELECT * FROM Appointments WHERE appointment_id = ?`, [id]);
   const before = beforeRows[0];
   if (!before) throw new Error("Appointment not found");
 

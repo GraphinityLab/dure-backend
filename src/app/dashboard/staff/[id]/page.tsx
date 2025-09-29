@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import axiosInstance from "@/utils/axiosInstance";
+import axios from "axios";
 import { motion, AnimatePresence } from "framer-motion";
 
 type StaffMember = {
@@ -18,7 +19,11 @@ type StaffMember = {
   postal_code: string;
 };
 
-const IMMUTABLE_FIELDS = new Set<keyof StaffMember>(["staff_id", "role_id", "username"]);
+const IMMUTABLE_FIELDS = new Set<keyof StaffMember>([
+  "staff_id",
+  "role_id",
+  "username",
+]);
 
 function buildUpdatePayload(
   form: Partial<StaffMember>,
@@ -53,7 +58,10 @@ export default function StaffProfilePage() {
   const params = useParams();
   const router = useRouter();
 
-  const staffIdParam = (params as Record<string, string | string[] | undefined>)?.id;
+  const staffIdParam = (params as Record<
+    string,
+    string | string[] | undefined
+  >)?.id;
   const staffId = useMemo(() => {
     const raw = Array.isArray(staffIdParam) ? staffIdParam[0] : staffIdParam;
     return raw ?? null;
@@ -102,27 +110,35 @@ export default function StaffProfilePage() {
       try {
         setLoading(true);
         setError(null);
-        const res = await axiosInstance.get(`/staff/${encodeURIComponent(staffId)}`);
-        setForm(res.data as StaffMember);
-      } catch (e: any) {
-        setError(
-          e?.response?.data?.message ||
-            e?.response?.data?.error ||
-            e?.message ||
-            "Failed to load staff info"
+        const res = await axiosInstance.get<StaffMember>(
+          `/staff/${encodeURIComponent(staffId)}`
         );
+        setForm(res.data);
+      } catch (e: unknown) {
+        if (axios.isAxiosError(e)) {
+          setError(
+            e.response?.data?.message ||
+            (e.response?.data as Record<string, unknown>)?.error?.toString() ||
+            e.message
+          );
+        } else {
+          setError("Failed to load staff info");
+        }
       } finally {
         setLoading(false);
       }
     })();
   }, [staffId]);
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-    setSuccess(null);
-    setError(null);
-  }, []);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      setForm((prev) => ({ ...prev, [name]: value }));
+      setSuccess(null);
+      setError(null);
+    },
+    []
+  );
 
   // Reset verification when current password changes
   useEffect(() => {
@@ -135,16 +151,26 @@ export default function StaffProfilePage() {
     setVerifying(true);
     setVerifyMsg(null);
     try {
-      await axiosInstance.post(`/staff/${encodeURIComponent(staffId)}/verify-password`, {
-        current_password: currentPw,
-      });
+      await axiosInstance.post(
+        `/staff/${encodeURIComponent(staffId)}/verify-password`,
+        {
+          current_password: currentPw,
+        }
+      );
       setIsVerified(true);
       setVerifyMsg("Current password verified.");
-    } catch (e: any) {
+    } catch (e: unknown) {
       setIsVerified(false);
-      const status = e?.response?.status;
-      const msg = e?.response?.data?.message || e?.response?.data?.error || "Incorrect current password.";
-      setVerifyMsg(`(${status ?? "Error"}) ${msg}`);
+      if (axios.isAxiosError(e)) {
+        const status = e.response?.status;
+        const msg =
+          e.response?.data?.message ||
+          (e.response?.data as Record<string, unknown>)?.error?.toString() ||
+          "Incorrect current password.";
+        setVerifyMsg(`(${status ?? "Error"}) ${msg}`);
+      } else {
+        setVerifyMsg("Error verifying password.");
+      }
     } finally {
       setVerifying(false);
     }
@@ -189,14 +215,17 @@ export default function StaffProfilePage() {
       setNewPw("");
       setConfirmPw("");
       router.refresh();
-    } catch (e: any) {
-      const status = e?.response?.status;
-      const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.error ||
-        e?.message ||
-        "Failed to update profile.";
-      setError(`(${status ?? "Error"}) ${msg}`);
+    } catch (e: unknown) {
+      if (axios.isAxiosError(e)) {
+        const status = e.response?.status;
+        const msg =
+          e.response?.data?.message ||
+          (e.response?.data as Record<string, unknown>)?.error?.toString() ||
+          e.message;
+        setError(`(${status ?? "Error"}) ${msg}`);
+      } else {
+        setError("Failed to update profile.");
+      }
     } finally {
       setSaving(false);
     }
@@ -211,23 +240,29 @@ export default function StaffProfilePage() {
   }
 
   if (loading) return <div className="text-center mt-10">Loading...</div>;
-  if (error && !success) return <div className="text-center mt-10 text-red-600">{error}</div>;
+  if (error && !success)
+    return <div className="text-center mt-10 text-red-600">{error}</div>;
 
   const initials =
-    `${form.first_name?.[0] ?? ""}${form.last_name?.[0] ?? ""}`.toUpperCase() || "👤";
+    `${form.first_name?.[0] ?? ""}${form.last_name?.[0] ?? ""}`.toUpperCase() ||
+    "👤";
   const passwordInputsDisabled = !isVerified;
 
-  const fields: Array<{ label: string; name: keyof StaffMember; type?: string; disabled?: boolean }> = [
-    { label: "First Name", name: "first_name" },
-    { label: "Last Name", name: "last_name" },
-    { label: "Username", name: "username", disabled: true },
-    { label: "Email", name: "email", type: "email" },
-    { label: "Address", name: "address" },
-    { label: "City", name: "city" },
-    { label: "Province", name: "province" },
-    { label: "Postal Code", name: "postal_code" },
-  ];
-
+  const fields: Array<{
+    label: string;
+    name: keyof StaffMember;
+    type?: string;
+    disabled?: boolean;
+  }> = [
+      { label: "First Name", name: "first_name" },
+      { label: "Last Name", name: "last_name" },
+      { label: "Username", name: "username", disabled: true },
+      { label: "Email", name: "email", type: "email" },
+      { label: "Address", name: "address" },
+      { label: "City", name: "city" },
+      { label: "Province", name: "province" },
+      { label: "Postal Code", name: "postal_code" }
+    ];
   return (
     <section className="max-w-2xl mx-auto mt-10 p-6 bg-gradient-to-br from-[#f6e9da] via-[#f2dfce] to-[#e8d4be] rounded-2xl shadow-lg border border-[#3e2e3d]/20">
       {/* Header */}
@@ -270,9 +305,8 @@ export default function StaffProfilePage() {
               value={(form[field.name] as string) || ""}
               onChange={handleChange}
               disabled={field.disabled}
-              className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${
-                field.disabled ? "bg-gray-100 cursor-not-allowed" : ""
-              }`}
+              className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${field.disabled ? "bg-gray-100 cursor-not-allowed" : ""
+                }`}
             />
           </label>
         ))}
@@ -305,9 +339,8 @@ export default function StaffProfilePage() {
           <span className="text-sm font-[CaviarDreams] text-[#3e2e3d]">New Password</span>
           <input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)}
             disabled={passwordInputsDisabled}
-            className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${
-              passwordInputsDisabled ? "bg-gray-100 cursor-not-allowed" : ""
-            }`} autoComplete="new-password" />
+            className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${passwordInputsDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`} autoComplete="new-password" />
         </label>
 
         {/* Confirm password */}
@@ -315,9 +348,8 @@ export default function StaffProfilePage() {
           <span className="text-sm font-[CaviarDreams] text-[#3e2e3d]">Confirm Password</span>
           <input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)}
             disabled={passwordInputsDisabled}
-            className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${
-              passwordInputsDisabled ? "bg-gray-100 cursor-not-allowed" : ""
-            }`} autoComplete="new-password" />
+            className={`px-3 py-2 rounded-lg border border-[#3e2e3d]/30 focus:outline-none ${passwordInputsDisabled ? "bg-gray-100 cursor-not-allowed" : ""
+              }`} autoComplete="new-password" />
         </label>
 
         {/* Save */}

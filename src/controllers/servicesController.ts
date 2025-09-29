@@ -85,9 +85,10 @@ export const createService = async (req: NextApiRequest, res: NextApiResponse) =
       message: 'Service created successfully.',
       service_id,
     });
-  } catch (error: any) {
-    console.error('Error creating service:', error);
-    return res.status(500).json({ message: 'Internal Server Error', error: error.message });
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error("Error creating service:", err);
+    res.status(500).json({ message: err.message || "Internal Server Error" });
   }
 };
 

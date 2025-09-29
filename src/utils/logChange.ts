@@ -6,21 +6,26 @@ interface LogChangeProps {
   entity_id: number;
   action: "create" | "update" | "delete";
   changed_by: string | null;
-  changes?: any;
+  changes?: unknown;
 }
 
 // ✅ Fields that should never appear raw in logs
 const SENSITIVE_KEYS = ["hashed_password", "password"];
 
-function sanitize(obj: any) {
+// ✅ sanitize handles both arrays and objects
+function sanitize(obj: unknown): unknown {
   if (!obj || typeof obj !== "object") return obj;
 
-  const clone: any = Array.isArray(obj) ? [] : {};
-  for (const key of Object.keys(obj)) {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitize(item));
+  }
+
+  const clone: Record<string, unknown> = {};
+  for (const key of Object.keys(obj as Record<string, unknown>)) {
     if (SENSITIVE_KEYS.includes(key)) {
       clone[key] = "***hidden***"; // mask sensitive field
     } else {
-      clone[key] = obj[key];
+      clone[key] = sanitize((obj as Record<string, unknown>)[key]);
     }
   }
   return clone;
@@ -38,9 +43,9 @@ export async function logChange({
   const safeChanges =
     changes && typeof changes === "object"
       ? {
-          old: sanitize(changes.old),
-          new: sanitize(changes.new),
-        }
+        old: sanitize((changes as { old?: unknown }).old),
+        new: sanitize((changes as { new?: unknown }).new),
+      }
       : changes;
 
   await pool.execute<ResultSetHeader>(

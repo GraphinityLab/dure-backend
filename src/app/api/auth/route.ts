@@ -16,13 +16,14 @@ export async function POST(request: Request) {
     const result = await loginStaff(identifier, password);
 
     return NextResponse.json(result, { status: 200 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("Auth login error:", error);
 
-    const status = error.message === "Invalid credentials" ? 401 : 500;
-    return NextResponse.json(
-      { message: error.message || "Internal Server Error" },
-      { status }
-    );
+    // Safely handle error without `any`
+    const message =
+      error instanceof Error ? error.message : "Internal Server Error";
+    const status = message === "Invalid credentials" ? 401 : 500;
+
+    return NextResponse.json({ message }, { status });
   }
 }

@@ -15,6 +15,11 @@ interface Props {
   >;
 }
 
+// Extend Appointment to include optional serviceDurationMinutes
+interface AppointmentWithDuration extends Appointment {
+  serviceDurationMinutes?: number;
+}
+
 const BUSINESS_HOURS = { start: "09:00", end: "17:00" };
 
 const DECLINE_REASONS = [
@@ -85,7 +90,8 @@ const EditAppointmentModal: React.FC<Props> = ({
   const [loadingDecline, setLoadingDecline] = useState(false);
 
   const availableDates = generateFutureDates();
-  const serviceDuration = (appointment as any).serviceDurationMinutes || 30;
+  const serviceDuration =
+    (appointment as AppointmentWithDuration).serviceDurationMinutes ?? 30;
 
   useEffect(() => {
     if (newDate) {
@@ -95,7 +101,7 @@ const EditAppointmentModal: React.FC<Props> = ({
         setNewTime(slots[0] || "");
       }
     }
-  }, [newDate, serviceDuration]);
+  }, [newDate, serviceDuration, newTime]);
 
   // ✅ UPDATE appointment
   const handleUpdate = async () => {
@@ -115,14 +121,14 @@ const EditAppointmentModal: React.FC<Props> = ({
         staff_id: selectedStaffId,
         appointment_date: newDate,
         start_time: newTime,
-        status: appointment.status, // preserve status if not changed
+        status: appointment.status,
       });
       setTimedMessage(setMessage, "Appointment updated successfully!", "success");
       onSuccess();
     } catch (err) {
-      const axiosError = err as AxiosError;
+      const axiosError = err as AxiosError<{ message?: string }>;
       const errorMessage =
-        (axiosError.response?.data as { message?: string })?.message ||
+        axiosError.response?.data?.message ||
         axiosError.message ||
         "Failed to update.";
       setTimedMessage(setMessage, errorMessage, "error");
@@ -314,32 +320,35 @@ const EditAppointmentModal: React.FC<Props> = ({
           <button
             onClick={handleUpdate}
             disabled={loadingUpdate}
-            className={`flex-1 px-4 py-2 rounded-full transition ${loadingUpdate
+            className={`flex-1 px-4 py-2 rounded-full transition ${
+              loadingUpdate
                 ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                 : "bg-[#c1a38f] text-white hover:bg-[#a78974]"
-              }`}
+            }`}
           >
             {loadingUpdate ? "Updating..." : "Update"}
           </button>
           <button
             onClick={handleDecline}
             disabled={loadingDecline}
-            className={`flex-1 px-4 py-2 rounded-full transition ${loadingDecline
+            className={`flex-1 px-4 py-2 rounded-full transition ${
+              loadingDecline
                 ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                 : "bg-red-200 text-red-800 hover:bg-red-300"
-              }`}
+            }`}
           >
             {loadingDecline ? "Declining..." : "Decline"}
           </button>
           <button
             onClick={handleConfirm}
             disabled={!selectedStaffId || loadingConfirm}
-            className={`flex-1 px-4 py-2 rounded-full transition ${loadingConfirm
+            className={`flex-1 px-4 py-2 rounded-full transition ${
+              loadingConfirm
                 ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                 : !selectedStaffId
-                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                  : "bg-green-200 text-green-800 hover:bg-green-300"
-              }`}
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : "bg-green-200 text-green-800 hover:bg-green-300"
+            }`}
           >
             {loadingConfirm ? "Confirming..." : "Confirm"}
           </button>
@@ -356,4 +365,3 @@ const EditAppointmentModal: React.FC<Props> = ({
 };
 
 export default EditAppointmentModal;
-  

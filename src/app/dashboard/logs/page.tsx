@@ -10,13 +10,18 @@ import {
   formatTimeOnly,
 } from "@/utils/formatDate";
 
+interface LogChanges {
+  old?: Record<string, unknown>;
+  new?: Record<string, unknown>;
+}
+
 interface Log {
   log_id: number;
   entity_type: string;
   entity_id: number;
   action: string;
   changed_by: string;
-  changes: any;
+  changes: LogChanges | null;
   created_at: string;
 }
 
@@ -39,11 +44,11 @@ export default function LogsPage() {
     const fetchLogs = async () => {
       try {
         const { data } = await axiosInstance.get("/logs");
-        const parsed = data.map((log: Log) => ({
+        const parsed: Log[] = data.map((log: Omit<Log, "changes"> & { changes: string | LogChanges }) => ({
           ...log,
           changes:
             typeof log.changes === "string"
-              ? JSON.parse(log.changes)
+              ? (JSON.parse(log.changes) as LogChanges)
               : log.changes,
         }));
         setLogs(parsed);
@@ -91,18 +96,20 @@ export default function LogsPage() {
   });
 
   // Smart formatter
-  const formatLogValue = (key: string, value: any) => {
-    if (!value) return String(value);
-    if (key === "appointment_date") return formatDateOnly(value as string);
-    if (key === "start_time" || key === "end_time") return formatTimeOnly(value as string);
+  const formatLogValue = (key: string, value: unknown): string => {
+    if (value === null || value === undefined) return String(value);
+    if (typeof value !== "string") return String(value);
+
+    if (key === "appointment_date") return formatDateOnly(value);
+    if (key === "start_time" || key === "end_time") return formatTimeOnly(value);
     if (key.toLowerCase().includes("date") || key.toLowerCase().includes("time")) {
       try {
-        return formatDateTime(value as string);
+        return formatDateTime(value);
       } catch {
-        return String(value);
+        return value;
       }
     }
-    return String(value);
+    return value;
   };
 
   return (
@@ -123,10 +130,11 @@ export default function LogsPage() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2 rounded-full text-sm font-[CaviarDreams] transition ${activeTab === tab
-              ? "bg-[#3e2e3d] text-white shadow"
-              : "bg-[#e8d4be] hover:bg-[#d6bfa6]"
-              }`}
+            className={`px-5 py-2 rounded-full text-sm font-[CaviarDreams] transition ${
+              activeTab === tab
+                ? "bg-[#3e2e3d] text-white shadow"
+                : "bg-[#e8d4be] hover:bg-[#d6bfa6]"
+            }`}
           >
             {tab}
           </button>
@@ -180,7 +188,7 @@ export default function LogsPage() {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
             className="px-5 py-2 rounded-full bg-[#e8d4be] text-sm font-[CaviarDreams] text-[#3e2e3d] shadow cursor-pointer"
-            disabled={!!(fromDate || toDate)} // disable if range is set
+            disabled={!!(fromDate || toDate)}
           >
             {dateOptions.map((d) => (
               <option key={d} value={d}>
@@ -293,12 +301,9 @@ export default function LogsPage() {
 
               {/* Metadata */}
               <div className="bg-[#f6e9da] rounded-xl p-5 mb-8 shadow-inner flex items-center gap-4">
-                {/* Avatar */}
                 <div className="w-12 h-12 rounded-full bg-[#3e2e3d] text-white flex items-center justify-center font-semibold text-lg shadow-md">
                   {(selectedLog.changed_by?.[0] ?? "U").toUpperCase()}
                 </div>
-
-                {/* Info Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 text-sm text-[#3e2e3d] w-full">
                   <p>
                     <span className="font-semibold">Entity:</span>{" "}
@@ -373,7 +378,6 @@ export default function LogsPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
     </section>
   );
 }

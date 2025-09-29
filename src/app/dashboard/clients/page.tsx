@@ -62,7 +62,9 @@ const ClientsPage = () => {
       const response = await axiosInstance.get('/clients', {
         headers: { 'x-user-permissions': JSON.stringify(['client_read_all']) }
       });
-      setClients(response.data);
+
+      // ✅ Extract the actual array
+      setClients(response.data.data || []);
     } catch (err: unknown) {
       console.error('Failed to fetch clients:', err);
       if (axios.isAxiosError(err) && err.response) {
@@ -74,6 +76,7 @@ const ClientsPage = () => {
       setLoading(false);
     }
   };
+
 
   const handleDeleteClient = async (clientId: number) => {
     try {

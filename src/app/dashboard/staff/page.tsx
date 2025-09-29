@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axiosInstance from '@/utils/axiosInstance';
+import axios from 'axios';
 import {
   FaEdit,
   FaTrash,
@@ -10,7 +11,7 @@ import {
   FaSearch,
   FaPlus,
   FaPhone,
-  FaUserTie
+  FaUserTie,
 } from 'react-icons/fa';
 
 interface Staff {
@@ -24,7 +25,7 @@ interface Staff {
   city?: string;
   province?: string;
   postalCode?: string;
-  roleId?: string;
+  roleId?: string | number;
   roleName?: string;
 }
 
@@ -58,7 +59,9 @@ const StaffPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'info' | 'edit' | 'delete' | 'create' | null>(null);
+  const [modalMode, setModalMode] = useState<
+    'info' | 'edit' | 'delete' | 'create' | null
+  >(null);
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null);
   const [formData, setFormData] = useState<StaffForm>({});
   const [showPasswordFields, setShowPasswordFields] = useState(false);
@@ -108,25 +111,32 @@ const StaffPage = () => {
   };
 
   // Fetch staff list
-  const fetchStaff = async () => {
+  const fetchStaff = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await axiosInstance.get('/staff');
+      const res = await axiosInstance.get<Staff[]>('/staff');
       setStaffList(res.data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to fetch staff:', err);
-      showMessage('error', err?.response?.data?.message || 'Failed to load staff data');
+      if (axios.isAxiosError(err)) {
+        showMessage(
+          'error',
+          err.response?.data?.message || 'Failed to load staff data'
+        );
+      } else {
+        showMessage('error', 'Failed to load staff data');
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch roles
   const fetchRoles = async () => {
     try {
-      const res = await axiosInstance.get('/roles');
+      const res = await axiosInstance.get<Role[]>('/roles');
       setRoles(res.data || []);
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Failed to fetch roles:', err);
     }
   };
@@ -134,10 +144,13 @@ const StaffPage = () => {
   useEffect(() => {
     fetchStaff();
     fetchRoles();
-  }, []);
+  }, [fetchStaff]);
 
   // Open modal
-  const openModal = (mode: 'info' | 'edit' | 'delete' | 'create', staff?: Staff) => {
+  const openModal = (
+    mode: 'info' | 'edit' | 'delete' | 'create',
+    staff?: Staff
+  ) => {
     setSelectedStaff(staff ?? null);
     setModalMode(mode);
     setShowPasswordFields(false);
@@ -187,16 +200,18 @@ const StaffPage = () => {
     setShowPasswordFields(false);
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleFormChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // ✅ Create / Update
   const handleSubmit = async () => {
     if (!modalMode) return;
 
-    const payload: any = {};
+    const payload: Record<string, unknown> = {};
     if (formData.firstName !== undefined) payload.first_name = formData.firstName;
     if (formData.lastName !== undefined) payload.last_name = formData.lastName;
     if (formData.email !== undefined) payload.email = formData.email;
@@ -242,9 +257,16 @@ const StaffPage = () => {
         showMessage('success', 'Staff updated successfully.');
         closeModal();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to save staff:', err);
-      showMessage('error', err?.response?.data?.message || 'Failed to save staff');
+      if (axios.isAxiosError(err)) {
+        showMessage(
+          'error',
+          err.response?.data?.message || 'Failed to save staff'
+        );
+      } else {
+        showMessage('error', 'Failed to save staff');
+      }
     } finally {
       setActionLoading(false);
     }
@@ -253,7 +275,8 @@ const StaffPage = () => {
   // ✅ Delete
   const handleDelete = async () => {
     if (!selectedStaff) return;
-    if (!confirm(`Delete ${selectedStaff.firstName} ${selectedStaff.lastName}?`)) return;
+    if (!confirm(`Delete ${selectedStaff.firstName} ${selectedStaff.lastName}?`))
+      return;
 
     const currentStaff = getCurrentStaff();
     const payload = {
@@ -265,22 +288,34 @@ const StaffPage = () => {
 
     setActionLoading(true);
     try {
-      await axiosInstance.delete(`/staff/${selectedStaff.staff_id}`, { data: payload });
+      await axiosInstance.delete(`/staff/${selectedStaff.staff_id}`, {
+        data: payload,
+      });
       await fetchStaff();
       showMessage('success', 'Staff deleted successfully.');
       closeModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to delete staff:', err);
-      showMessage('error', err?.response?.data?.message || 'Failed to delete staff');
+      if (axios.isAxiosError(err)) {
+        showMessage(
+          'error',
+          err.response?.data?.message || 'Failed to delete staff'
+        );
+      } else {
+        showMessage('error', 'Failed to delete staff');
+      }
     } finally {
       setActionLoading(false);
     }
   };
 
-  const filteredStaff = staffList.filter(s =>
-    `${s.firstName ?? ''} ${s.lastName ?? ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.email ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.roleName ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredStaff = staffList.filter(
+    (s) =>
+      `${s.firstName ?? ''} ${s.lastName ?? ''}`
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      (s.email ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.roleName ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (

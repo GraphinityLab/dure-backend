@@ -1,12 +1,25 @@
-// src/app/api/logs/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { NextApiRequest } from "next";
 import { getLogs } from "@/controllers/logController";
 
+// Minimal type for our mock response
+interface MockResponse {
+  status: (statusCode: number) => MockResponse;
+  json: (data: unknown) => void;
+}
+
 // Utility: create mock API objects
-const createMockApiObjects = async (request: NextRequest, includeBody = false) => {
-  let responseData: any;
-  let responseStatus: number = 200;
+const createMockApiObjects = async (
+  request: NextRequest,
+  includeBody = false
+): Promise<{
+  mockRequest: NextApiRequest;
+  mockResponse: MockResponse;
+  responseData: unknown;
+  responseStatus: number;
+}> => {
+  let responseData: unknown;
+  let responseStatus = 200;
 
   const mockRequest: NextApiRequest = {
     method: request.method as "GET" | "POST",
@@ -17,12 +30,12 @@ const createMockApiObjects = async (request: NextRequest, includeBody = false) =
     env: {},
   } as NextApiRequest;
 
-  const mockResponse = {
+  const mockResponse: MockResponse = {
     status: (statusCode: number) => {
       responseStatus = statusCode;
       return mockResponse;
     },
-    json: (data: any) => {
+    json: (data: unknown) => {
       responseData = data;
     },
   };
@@ -33,7 +46,7 @@ const createMockApiObjects = async (request: NextRequest, includeBody = false) =
     get responseData() {
       return responseData;
     },
-    set responseData(value: any) {
+    set responseData(value: unknown) {
       responseData = value;
     },
     get responseStatus() {
@@ -46,14 +59,17 @@ const createMockApiObjects = async (request: NextRequest, includeBody = false) =
 };
 
 // Permissions middleware
-const checkPermissions = (request: NextRequest, requiredPermissions: string[]) => {
+const checkPermissions = (
+  request: NextRequest,
+  requiredPermissions: string[]
+): NextResponse | null => {
   const userPermissionsHeader = request.headers.get("x-user-permissions");
   if (!userPermissionsHeader) {
     return NextResponse.json({ message: "Permissions not found" }, { status: 403 });
   }
 
   try {
-    const userPermissions = JSON.parse(userPermissionsHeader);
+    const userPermissions: string[] = JSON.parse(userPermissionsHeader);
     const hasPermission = requiredPermissions.every((p) =>
       userPermissions.includes(p)
     );
@@ -70,19 +86,18 @@ const checkPermissions = (request: NextRequest, requiredPermissions: string[]) =
 // ✅ GET /api/logs - Fetch all logs
 export async function GET(request: NextRequest) {
   const permissionError = checkPermissions(request, ["logs_read_all"]);
-  if (permissionError) {
-    return permissionError;
-  }
+  if (permissionError) return permissionError;
 
   try {
     const api = await createMockApiObjects(request);
 
     const logs = await getLogs();
-    const serializableLogs = logs.map((log) => ({ ...log }));
+    const serializableLogs = logs.map((log: Record<string, unknown>) => ({ ...log }));
 
     return NextResponse.json(serializableLogs, { status: api.responseStatus });
   } catch (error) {
     console.error("GET logs route error:", error);
-    return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Internal Server Error";
+    return NextResponse.json({ message }, { status: 500 });
   }
 }

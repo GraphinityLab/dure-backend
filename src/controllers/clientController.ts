@@ -1,9 +1,10 @@
+// controllers/clientController.ts
 import { NextApiRequest, NextApiResponse } from "next";
 import pool from "@/utils/db";
-import { ResultSetHeader } from "mysql2";
+import { ResultSetHeader, RowDataPacket } from "mysql2";
 
-// Interface for the client data
-interface Client {
+// ---------------- Types ----------------
+export interface Client extends RowDataPacket {
   client_id?: number;
   first_name: string;
   last_name: string;
@@ -14,9 +15,15 @@ interface Client {
   postal_code?: string;
 }
 
-/**
- * Helper: Build changed_by from headers
- */
+type ChangeLog = {
+  entity_type: string;
+  entity_id: number;
+  action: string;
+  changed_by: string;
+  changes?: Record<string, unknown> | null;
+};
+
+// ---------------- Helpers ----------------
 function getChangedBy(req: NextApiRequest): string {
   const first = req.headers["x-first-name"] as string | undefined;
   const last = req.headers["x-last-name"] as string | undefined;
@@ -25,28 +32,21 @@ function getChangedBy(req: NextApiRequest): string {
   return "System";
 }
 
-/**
- * Log changes into ChangeLogs
- */
 async function logChange({
   entity_type,
   entity_id,
   action,
   changed_by,
   changes,
-}: {
-  entity_type: string;
-  entity_id: number;
-  action: string;
-  changed_by: string;
-  changes?: any;
-}) {
+}: ChangeLog) {
   await pool.execute<ResultSetHeader>(
     `INSERT INTO ChangeLogs (entity_type, entity_id, action, changed_by, changes)
      VALUES (?, ?, ?, ?, ?)`,
     [entity_type, entity_id, action, changed_by, JSON.stringify(changes ?? {})]
   );
 }
+
+// ---------------- Controllers ----------------
 
 /**
  * @desc Create a new client
@@ -70,7 +70,6 @@ export const createClient = async (req: NextApiRequest, res: NextApiResponse) =>
     const client_id = result.insertId;
     const changed_by = getChangedBy(req);
 
-    // Log creation
     await logChange({
       entity_type: "client",
       entity_id: client_id,
@@ -98,9 +97,9 @@ export const createClient = async (req: NextApiRequest, res: NextApiResponse) =>
 /**
  * @desc Get all clients
  */
-export const getAllClients = async (req: NextApiRequest, res: NextApiResponse) => {
+export const getAllClients = async (_req: NextApiRequest, res: NextApiResponse) => {
   try {
-    const [rows] = await pool.execute("SELECT * FROM Clients");
+    const [rows] = await pool.execute<Client[]>("SELECT * FROM Clients");
     return res.status(200).json(rows);
   } catch (err) {
     console.error("Error fetching all clients:", err);
@@ -114,8 +113,11 @@ export const getAllClients = async (req: NextApiRequest, res: NextApiResponse) =
 export const getClientById = async (req: NextApiRequest, res: NextApiResponse) => {
   const { id } = req.query;
   try {
-    const [rows] = await pool.execute("SELECT * FROM Clients WHERE client_id = ?", [id]);
-    const client = (rows as any)[0];
+    const [rows] = await pool.execute<Client[]>(
+      "SELECT * FROM Clients WHERE client_id = ?",
+      [id]
+    );
+    const client = rows[0];
     if (!client) return res.status(404).json({ message: "Client not found" });
     return res.status(200).json(client);
   } catch (err) {
@@ -138,9 +140,11 @@ export const updateClient = async (req: NextApiRequest, res: NextApiResponse) =>
   }
 
   try {
-    // Fetch old data for logging
-    const [oldRows] = await pool.execute("SELECT * FROM Clients WHERE client_id = ?", [id]);
-    const oldData = (oldRows as any)[0];
+    const [oldRows] = await pool.execute<Client[]>(
+      "SELECT * FROM Clients WHERE client_id = ?",
+      [id]
+    );
+    const oldData = oldRows[0];
 
     const [result] = await pool.execute<ResultSetHeader>(
       `UPDATE Clients 
@@ -155,7 +159,6 @@ export const updateClient = async (req: NextApiRequest, res: NextApiResponse) =>
 
     const changed_by = getChangedBy(req);
 
-    // Log update
     await logChange({
       entity_type: "client",
       entity_id: Number(id),
@@ -190,9 +193,11 @@ export const deleteClient = async (req: NextApiRequest, res: NextApiResponse) =>
   const { id } = req.query;
 
   try {
-    // Fetch old data for logging
-    const [oldRows] = await pool.execute("SELECT * FROM Clients WHERE client_id = ?", [id]);
-    const oldData = (oldRows as any)[0];
+    const [oldRows] = await pool.execute<Client[]>(
+      "SELECT * FROM Clients WHERE client_id = ?",
+      [id]
+    );
+    const oldData = oldRows[0];
 
     const [result] = await pool.execute<ResultSetHeader>(
       "DELETE FROM Clients WHERE client_id = ?",
@@ -205,7 +210,6 @@ export const deleteClient = async (req: NextApiRequest, res: NextApiResponse) =>
 
     const changed_by = getChangedBy(req);
 
-    // Log deletion
     await logChange({
       entity_type: "client",
       entity_id: Number(id),
