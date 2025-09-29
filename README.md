@@ -66,10 +66,10 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 Production build:  
 
-\`\`\`bash
+```bash
 npm run build
 npm run start
-\`\`\`
+```
 
 If self-hosting:  
 - Use **Nginx** as a reverse proxy  
@@ -96,7 +96,7 @@ If self-hosting:
 
 Every action is tracked with \`changed_by\`:  
 
-\`\`\`json
+```json
 {
   "entity_type": "appointment",
   "entity_id": 42,
@@ -107,7 +107,7 @@ Every action is tracked with \`changed_by\`:
     "new": { "status": "confirmed" }
   }
 }
-\`\`\`
+```
 
 ---
 
@@ -115,17 +115,17 @@ Every action is tracked with \`changed_by\`:
 
 1. Fork the project 🍴  
 2. Create your branch:  
-   \`\`\`bash
+   ```bash
    git checkout -b feature/amazing-feature
-   \`\`\`  
+   ``` 
 3. Commit your changes:  
-   \`\`\`bash
+   ```bash
    git commit -m "Added amazing feature"
-   \`\`\`  
+   ``` 
 4. Push to the branch:  
-   \`\`\`bash
+   ```bash
    git push origin feature/amazing-feature
-   \`\`\`  
+   ```  
 5. Open a Pull Request 🚀  
 
 ---
